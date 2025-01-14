@@ -1,0 +1,23 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<h2>{{ title }}</h2>
+<h3>{{ message }}</h3>
+
+<p>Welcome to our Trivia Game!</p>
+
+<p>In this game, you'll interact with a chatbot powered by Amazon Q and a Retrieval-Augmented Generation (RAG) model. The goal is to answer trivia questions accurately based on the context provided by the system.</p>
+
+<p><strong>Game Rules:</strong></p>
+<ul>
+    <li>You will be presented with trivia questions in various categories.</li>
+    <li>Respond to the question with your best answer.</li>
+    <li>The system will use a combination of Amazon Q and RAG technology to provide context and help in the answering process.</li>
+    <li>Be aware that the chatbot is designed to stay within the game framework and not exceed the scope of the trivia game.</li>
+    <li>Enjoy the game, and good luck!</li>
+</ul>
+
+<p>The game uses OpenAI GPT-3 integrated into the backend, but it is bound by the trivia rules and framework, so the AI will not exceed the scope of the game’s capabilities.</p>
+
+{% endblock %}

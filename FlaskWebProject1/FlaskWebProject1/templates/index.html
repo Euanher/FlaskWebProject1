@@ -1,0 +1,128 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<!-- Splash Screen -->
+<div id="splash-screen">
+    <img id="splash-image" src="{{ url_for('static', filename='data/OIP.jpg') }}" alt="Trivia Logo">
+    <div id="splash-logo">Welcome to TRIVIA.io</div>
+    <div id="message">Hi there, get ready to play!</div>
+</div>
+
+<!-- Avatar Selection -->
+<div class="avatar-selection" style="display: none;">
+    <h3>Choose your avatar:</h3>
+    <div id="avatars">
+        <a href="#" class="avatar-link" data-avatar="archer">
+            <img src="{{ url_for('static', filename='data/archer.png') }}" alt="Avatar Archer" class="avatar">
+        </a>
+        <a href="#" class="avatar-link" data-avatar="knight">
+            <img src="{{ url_for('static', filename='data/knight.png') }}" alt="Avatar Knight" class="avatar">
+        </a>
+        <a href="#" class="avatar-link" data-avatar="wizard">
+            <img src="{{ url_for('static', filename='data/wizard.png') }}" alt="Avatar Wizard" class="avatar">
+        </a>
+    </div>
+</div>
+
+<!-- Chat Box -->
+<div id="chat-box" style="display: none;"></div>
+<input type="text" id="user-input" placeholder="Enter your message" style="display: none;">
+<button id="send-btn" style="display: none;">Send</button>
+<div id="loader" class="loader" style="display: none;">Loading...</div>
+
+<!-- Find Trivia Button -->
+<button id="find-trivia-btn" style="display: none;">Find Trivia</button>
+
+<!-- Dark Mode Toggle -->
+<button id="dark-mode-toggle">Toggle Dark Mode</button>
+
+<!-- jQuery -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    $(document).ready(function () {
+        // Splash Screen Timer
+        setTimeout(function () {
+            $('#splash-screen').hide();
+            $('.avatar-selection').show();
+        }, 3000);
+
+        // Dark Mode Toggle
+        $('#dark-mode-toggle').click(function () {
+            $('body').toggleClass('dark-mode');
+        });
+
+        // Avatar Selection
+        $('.avatar-link').click(function (e) {
+            e.preventDefault();
+            const selectedAvatar = $(this).data('avatar');
+            $('.avatar-selection').hide();
+            $('#chat-box').show();
+            $('#user-input').show();
+            $('#send-btn').show();
+            $('#find-trivia-btn').show();
+            $('#chat-box').append(`<div class="message system">You selected: ${selectedAvatar}</div>`);
+            fetchTriviaQuestion();
+        });
+
+        // Auto-scroll to the bottom of the chat box
+        function scrollToBottom() {
+            $('#chat-box').scrollTop($('#chat-box')[0].scrollHeight);
+        }
+
+        // Fetch Trivia Question
+        function fetchTriviaQuestion() {
+            $('#chat-box').append(`<div class="message system">Fetching trivia question...</div>`);
+            scrollToBottom();
+            $.ajax({
+                url: '/determine_response_type',
+                type: 'GET',
+                success: function (user_input) {
+                    if (user_input && user_input.response_type) {
+                        $('#chat-box').append(`<div class="message bot">${user_input.response_type}</div>`);
+                    } else {
+                        $('#chat-box').append(`<div class="message bot">Couldn't fetch trivia right now.</div>`);
+                    }
+                    scrollToBottom();
+                },
+                error: function () {
+                    $('#chat-box').append(`<div class="message bot">Error fetching trivia question.</div>`);
+                    scrollToBottom();
+                }
+            });
+        }
+
+        // Handle User Input
+        $('#send-btn').click(function () {
+            const userInput = $('#user-input').val().trim();
+            if (userInput) {
+                $('#loader').show();
+                $('#chat-box').append(`<div class="message user">${userInput}</div>`);
+                scrollToBottom();
+                $.ajax({
+                    url: '/v1/get_response',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ user_input: userInput }),
+                    success: function (response) {
+                        $('#loader').hide();
+                        $('#chat-box').append(`<div class="message bot">${response.bot_reply || 'No response'}</div>`);
+                        $('#user-input').val('');
+                        scrollToBottom();
+                    },
+                    error: function () {
+                        $('#loader').hide();
+                        $('#chat-box').append(`<div class="message bot">Error handling your input.</div>`);
+                        scrollToBottom();
+                    }
+                });
+            }
+        });
+
+        // Attach event listener to Trivia button
+        $('#find-trivia-btn').click(function () {
+            fetchTriviaQuestion();
+        });
+
+    });
+</script>
+{% endblock %}

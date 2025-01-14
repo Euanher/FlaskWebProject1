@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - TRIVIA.io</title>
+    <link rel="stylesheet" href="/static/content/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/content/site.css">
+    <style>
+        /* Dark Mode & General Styles */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+            body.dark-mode {
+                background-color: #121212;
+                color: #ffffff;
+            }
+
+        /* Splash Screen Styles */
+        #splash-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: url('/static/data/R.png') no-repeat center center;
+            background-size: cover;
+            transition: filter 0.3s;
+        }
+
+        body.dark-mode #splash-screen {
+            filter: brightness(0.7);
+        }
+
+        #splash-logo, #message {
+            color: white;
+        }
+
+        #splash-logo {
+            font-size: 2rem;
+        }
+
+        #chat-box {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 10px;
+            background-color: #ffffff;
+        }
+
+        body.dark-mode #chat-box {
+            background-color: #333333;
+        }
+    </style>
+    <script src="/static/scripts/modernizr-2.6.2.js"></script>
+</head>
+<body>
+    <!-- Navbar -->
+    <div class="navbar navbar-inverse navbar-fixed-top">
+        <div class="container">
+            <div class="navbar-header">
+                <a href="/" class="navbar-brand">Trivia</a>
+            </div>
+            <div class="navbar-collapse collapse">
+                <ul class="nav navbar-nav">
+                    <li><a href="{{ url_for('home') }}">Home</a></li>
+                    <li><a href="{{ url_for('about') }}">About</a></li>
+                    <li><a href="{{ url_for('contact') }}">Contact</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container body-content">
+        {% block content %}
+        {% endblock %}
+        <hr>
+        <footer>
+            <p>&copy; {{ year }} - My Flask Application</p>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/scripts/jquery-1.10.2.js"></script>
+    <script src="/static/scripts/bootstrap.js"></script>
+    <script src="/static/scripts/respond.js"></script>
+    <script src="/static/script.js"></script>
+
+    {% block scripts %}
+    {% endblock %}
+</body>
+</html>

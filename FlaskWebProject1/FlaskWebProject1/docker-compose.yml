@@ -1,0 +1,24 @@
+version: '3'
+
+services:
+  localstack:
+    image: localstack/localstack:latest
+    container_name: localstack_main
+    ports:
+      - "4566:4566"  # LocalStack Gateway
+      - "4510-4559:4510-4559"  # For the individual services
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - SERVICES=s3,dynamodb,kendra,sqs  # Include the services you want
+      - DEFAULT_REGION=us-east-1  # Change to preferred AWS region
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"  # To allow access to Docker
+      - "./localstack:/var/lib/localstack"  # Persistence for LocalStack data
+    networks:
+      - localstack_network
+
+   
+networks:
+  localstack_network:
+    driver: bridge
+

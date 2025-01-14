@@ -1,0 +1,146 @@
+{
+  "models": [
+    {
+      "id": "hermes-3-llama-3.2-3b",
+      "object": "model",
+      "owned_by": "organization-owner",
+      "permission": [ {} ]
+    }
+  ],
+  "RAGData": {
+    "chat_engine": {
+      "system_prompt": {
+        "initial": {
+          "user_message": [ "user_input", "" ],
+          "system_prompt": []
+        },
+        "trivia_flow": [
+          {
+            "auto_hello_response": "Hello! Do you want to play Trivia? (yes/no)"
+          },
+          {
+            "auto_hello_message": "hello"
+          },
+          {
+            "auto_hello_message": "yes"
+          },
+          {
+            "trivia_response": "Great! Here's your first Trivia question: What is the capital of France?"
+          },
+          {
+            "auto_hello_message": "no"
+          },
+          {
+            "goodbye_response": "Thank you! Goodbye!"
+          }
+        ]
+      },
+      "system_messages": {
+        "index": {
+          "system_message_prefix": "SYS",
+          "system_message_suffix": "SYS_END"
+        }
+      }
+    },
+    "properties": {
+      "chat_engine": "ChatEngineData"
+    }
+  },
+  "data": [
+    {
+      "id": "TheBloke/Mistral-7B-Instruct-v0.2-GGUF/mistral-7b-instruct-v0.2.Q2_K.gguf",
+      "object": "model",
+      "owned_by": "organization-owner",
+      "permission": [ {} ]
+    },
+    {
+      "id": "jeiku/General_Purpose_3B_GGUF/General_Purpose_3B-Q2_K.gguf",
+      "object": "model",
+      "owned_by": "organization-owner",
+      "permission": [ {} ]
+    }
+  ],
+  "object": "list",
+  "ChatEngineData": {
+    "properties": {
+      "system_prompt": "SystemPromptData"
+    }
+  },
+  "SystemPromptData": {
+    "properties": {
+      "system_messages": "SystemMessagesData"
+    }
+  },
+  "SystemMessagesData": {
+    "properties": {
+      "index": {
+        "system_message_prefix": "SYS",
+        "system_message_suffix": "SYS_END"
+      }
+    }
+  },
+  "trivia": {
+    "description": "Fetches a list of trivia questions from the server.",
+    "response": {
+      "success": {
+        "status": 200,
+        "body": [
+          {
+            "question": "What is the capital of France?",
+            "options": [ "Paris", "London", "Berlin", "Madrid" ],
+            "answer": "Paris",
+            "category": "Geography"
+          },
+          {
+            "question": "Who wrote '1984'?",
+            "options": [ "George Orwell", "Aldous Huxley", "J.K. Rowling", "Ernest Hemingway" ],
+            "answer": "George Orwell",
+            "category": "Literature"
+          },
+          {
+            "question": "Which planet is known as the Red Planet?",
+            "options": [ "Mars", "Venus", "Jupiter", "Saturn" ],
+            "answer": "Mars",
+            "category": "Science"
+          },
+          {
+            "question": "What is the name of the longest river in the world?",
+            "options": [ "Amazon", "Nile", "Yangtze", "Mississippi" ],
+            "answer": "Nile",
+            "category": "Geography"
+          },
+          {
+            "question": "Who won the 2020 Academy Award for Best Picture?",
+            "options": [ "Parasite", "1917", "Joker", "Once Upon a Time in Hollywood" ],
+            "answer": "Parasite",
+            "category": "Movies"
+          },
+          {
+            "question": "Who is known as the 'King of Pop'?",
+            "options": [ "Michael Jackson", "Elvis Presley", "Justin Timberlake", "Prince" ],
+            "answer": "Michael Jackson",
+            "category": "Music"
+          },
+          {
+            "question": "What is the national sport of Canada?",
+            "options": [ "Ice Hockey", "Lacrosse", "Soccer", "Basketball" ],
+            "answer": "Lacrosse",
+            "category": "Sports"
+          },
+          {
+            "question": "What is the largest planet in our solar system?",
+            "options": [ "Jupiter", "Saturn", "Neptune", "Earth" ],
+            "answer": "Jupiter",
+            "category": "Science"
+          }
+        ]
+      },
+      "error": {
+        "status": 404,
+        "body": {
+          "error": "No trivia data found."
+        }
+      }
+    }
+  }
+}

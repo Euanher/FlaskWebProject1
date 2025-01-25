@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 import os
 import logging
 import json
-import random  
+import random
 import requests
 from transformers import pipeline  # type: ignore
 import openai

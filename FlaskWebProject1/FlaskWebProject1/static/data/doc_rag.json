@@ -1,4 +1,25 @@
 {
+  "id": "chatcmpl-3lyx7b7ovpdscrvbf38qee",
+  "object": "chat.completion",
+  "created": 1737899360,
+  "model": "qwen2.5-3b-instruct",
+  "choices": [
+    {
+      "index": 0,
+      "logprobs": null,
+      "finish_reason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Today, it's Thursday, a day to be free and gay."
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 28,
+    "completion_tokens": 14,
+    "total_tokens": 42
+  },
+  "system_fingerprint": "qwen2.5-3b-instruct",
   "models": [
     {
       "id": "hermes-3-llama-3.2-3b",
@@ -60,7 +81,7 @@
       "permission": [ {} ]
     }
   ],
-  "object": "list",
+  "items": "list",
   "ChatEngineData": {
     "properties": {
       "system_prompt": "SystemPromptData"
@@ -93,7 +114,12 @@
           },
           {
             "question": "Who wrote '1984'?",
-            "options": [ "George Orwell", "Aldous Huxley", "J.K. Rowling", "Ernest Hemingway" ],
+            "options": [
+              "George Orwell",
+              "Aldous Huxley",
+              "J.K. Rowling",
+              "Ernest Hemingway"
+            ],
             "answer": "George Orwell",
             "category": "Literature"
           },
@@ -111,13 +137,23 @@
           },
           {
             "question": "Who won the 2020 Academy Award for Best Picture?",
-            "options": [ "Parasite", "1917", "Joker", "Once Upon a Time in Hollywood" ],
+            "options": [
+              "Parasite",
+              "1917",
+              "Joker",
+              "Once Upon a Time in Hollywood"
+            ],
             "answer": "Parasite",
             "category": "Movies"
           },
           {
             "question": "Who is known as the 'King of Pop'?",
-            "options": [ "Michael Jackson", "Elvis Presley", "Justin Timberlake", "Prince" ],
+            "options": [
+              "Michael Jackson",
+              "Elvis Presley",
+              "Justin Timberlake",
+              "Prince"
+            ],
             "answer": "Michael Jackson",
             "category": "Music"
           },

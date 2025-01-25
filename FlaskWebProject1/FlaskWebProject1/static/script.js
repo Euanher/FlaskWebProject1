@@ -20,8 +20,8 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleLoader(true);
 
         try {
-            const data = await fetchAPI('/api/process_user_input', { user_message: userInputValue });
-            handleRAGResponse(data, userInputValue);
+            const data = await fetchAPI('/v1/chat/completions', { prompt: userInputValue });
+            handleChatResponse(data, userInputValue);
         } catch (error) {
             console.error('Error:', error);
             displayMessage('system_message', 'Sorry, there was an error processing your request.');
@@ -58,9 +58,9 @@ document.addEventListener('DOMContentLoaded', () => {
         loader.style.display = isVisible ? 'block' : 'none';
     }
 
-    // Handle RAG API Response
-    function handleRAGResponse(data, userInputValue) {
-        const assistantMessage = data.assistant_response?.response || "No response from assistant.";
+    // Handle Chat API Response
+    function handleChatResponse(data, userInputValue) {
+        const assistantMessage = data.response || "No response from assistant.";
         const systemMessages = data.system_messages || [];
 
         // Display user and bot messages
@@ -114,8 +114,8 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleLoader(true);
 
         try {
-            const data = await fetchAPI('/determine_response_type', {});
-            const triviaQuestion = data.question || "No question available.";
+            const data = await fetchAPI('/v1/completions', { prompt: 'What is the capital of France?' });
+            const triviaQuestion = data.response || "No question available.";
             displayMessage('bot', triviaQuestion);
         } catch (error) {
             console.error('Error:', error);

@@ -1,10 +1,12 @@
-import express, { json, urlencoded } from 'express';
-import { config, DynamoDB, S3 } from 'aws-sdk';
-import multer from 'multer';
-import cors from 'cors';
-import dotenv from 'dotenv';
+import express from 'express'; // No need to destructure, just import the module
+import { json, urlencoded } from 'express'; // Explicitly importing middleware functions
+import { config, DynamoDB, S3 } from 'aws-sdk'; // AWS SDK modules
+import multer from 'multer'; // File upload utility
+import cors from 'cors'; // Enable Cross-Origin Resource Sharing
+import dotenv from 'dotenv'; // Load environment variables
 
-dotenv.config(); // Load environment variables
+// Load environment variables
+dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -24,8 +26,9 @@ config.update({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
 });
 
+// Ensure AWS credentials are loaded
 if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
-    console.error('AWS credentials are missing.');
+    console.error('AWS credentials are missing. Exiting...');
     process.exit(1);
 }
 
@@ -34,9 +37,14 @@ const dynamoDB = new DynamoDB.DocumentClient();
 
 // Fetch trivia data
 const getTriviaData = async () => {
-    const params = { TableName: 'trivia-questions' };
-    const data = await dynamoDB.scan(params).promise();
-    return data.Items || [];
+    try {
+        const params = { TableName: 'trivia-questions' };
+        const data = await dynamoDB.scan(params).promise();
+        return data.Items || [];
+    } catch (error) {
+        console.error('Error fetching trivia data:', error);
+        throw error; // Ensure calling functions handle errors
+    }
 };
 
 // Fetch trivia endpoint
@@ -44,12 +52,11 @@ app.get('/get_trivia', async (req, res) => {
     try {
         const triviaData = await getTriviaData();
         if (!triviaData.length) {
-            return res.status(404).json({ error: 'No trivia data found' });
+            return res.status(404).json({ error: 'No trivia data found.' });
         }
         res.json(triviaData);
     } catch (error) {
-        console.error('Error fetching trivia data:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: 'Internal server error.' });
     }
 });
 
@@ -132,7 +139,7 @@ app.post('/v1/auto_hello', (req, res) => {
 // Generic error handler
 app.use((err, req, res, next) => {
     console.error('Unhandled Error:', err.stack);
-    res.status(500).send({ error: 'Internal server error' });
+    res.status(500).send({ error: 'Internal server error.' });
 });
 
 // Start the server

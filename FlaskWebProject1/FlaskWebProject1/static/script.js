@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const startGameButton = document.querySelector('#start-game');
     const darkModeToggle = document.querySelector('#dark-mode-toggle');
     const avatars = document.querySelectorAll('.avatar');
+    const data = await fetchAPI('/v1/chat/completions', { user_message: userInputValue });
 
     // Handle Send Button click
     sendButton.addEventListener('click', async () => {

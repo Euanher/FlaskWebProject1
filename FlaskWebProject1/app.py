@@ -90,37 +90,121 @@ def rag_tokenizer(messages):
 def get_models():
     return jsonify({"models": models}), 200
 
+from flask import Flask, request, jsonify
+import os
+import logging
+import json
+import requests
+import boto3
+from botocore.exceptions import ClientError
+
+app = Flask(__name__)
+
+# Configuration
+AWS_REGION = "us-east-1"
+AWS_ACCESS_KEY_ID = "test"
+AWS_SECRET_ACCESS_KEY = "test"
+AWS_ENDPOINT_URL = "http://localhost:4566"  # Localstack for testing
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "YOUR_OPENAI_API_KEY")
+llama_model_url = "http://localhost:5000"
+llama_model_id = "hermes-3-llama-3.2-3b"
+KENDRA_INDEX_ID = "ls-xArASidO-deKO-4515-XArI-BIVo1000d275"  # Example Kendra index ID
+
+# Create the AWS Kendra client
+kendra_client = boto3.client(
+    'kendra',
+    region_name=AWS_REGION,
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+    endpoint_url=AWS_ENDPOINT_URL  # Optional, useful for testing with LocalStack
+)
+
+# Logging setup
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Function to search Kendra
+def search_kendra(query, index_id):
+    try:
+        response = kendra_client.query(
+            IndexId=index_id,
+            QueryText=query
+        )
+        results = response.get('ResultItems', [])
+        if results:
+            return [result['DocumentTitle']['Text'] for result in results if 'DocumentTitle' in result]
+        else:
+            return ["No relevant documents found."]
+    except ClientError as e:
+        logger.error(f"Error querying Kendra: {e}")
+        return ["Error querying Kendra."]
+
+# Route for /v1/chat/completions
 @app.route('/v1/chat/completions', methods=['POST'])
 def chat_completions():
+    data = request.get_json()
+    
+    # Handle the logic for chat completions here
+    user_message = data.get('user_message', 'What is the capital of France?')
+    assistant_response = f"This is a simulated response based on: {user_message}"
+    
+    response = {
+        "assistant_response": {
+            "response": assistant_response
+        }
+    }
+
+    return jsonify(response)
+
+# Route for /determine_response_type
+@app.route('/determine_response_type', methods=['POST'])
+def determine_response_type():
+    user_input = request.json.get("user_input", "")
+    response_type = "initial"  # Default response type
+
+    if "hello" in user_input.lower():
+        response_type = "initial"
+    # Add additional logic to determine response_type
+
+    return jsonify({"response_type": response_type})
+
+# Route for /v1/get_response
+@app.route('/v1/get_response', methods=['POST'])
+def get_response():
     try:
-        data = request.json
-        model_id = data.get("model")
-        messages = data.get("messages", [])
-        if not model_id or not messages:
-            return jsonify({"error": "Missing required parameters: 'model' or 'messages'"}), 400
+        data = request.get_json()
+        user_input = data.get('user_input', '')
 
-        tokenized_messages = rag_tokenizer(messages)
+        if not user_input:
+            return jsonify({"error": "Missing user input"}), 400
 
-        if model_id == "qwen2.5-3b-instruct":
-            response = {
-                "id": "chatcmpl-123",
-                "object": "chat.completion",
-                "choices": [
-                    {
-                        "message": {
-                            "role": "assistant",
-                            "content": "The day is Thursday, I must say. It rhymes in a poetic way."
-                        }
-                    }
-                ],
-                "tokenized_input": tokenized_messages,
-            }
-            return jsonify(response), 200
+        # Search Kendra for related documents based on user input
+        kendra_results = search_kendra(user_input, KENDRA_INDEX_ID)
+
+        # Prepare the payload for the Llama model
+        payload = {
+            "input": user_input,
+            "model": llama_model_id
+        }
+
+        # Query the Llama model
+        response = requests.post(f"{llama_model_url}/predict", json=payload)
+
+        if response.status_code == 200:
+            model_output = response.json().get("output", "")
+            response_message = f"Model response: {model_output}"
+            return jsonify({
+                "model_output": model_output,
+                "kendra_results": kendra_results,
+                "response_message": response_message
+            }), 200
         else:
-            return jsonify({"error": f"Model '{model_id}' not supported"}), 400
-    except Exception as e:
-        logger.error(f"Error processing chat completions: {e}")
-        return jsonify({"error": str(e)}), 500
+            logger.error(f"Llama model server error: {response.status_code} - {response.text}")
+            return jsonify({"error": "Failed to get a response from the model."}), 500
+    except Exception as error:
+        logger.error(f"Error in getting response: {error}")
+        return jsonify({"error": str(error)}), 500
+ 
 
 @app.route('/v1/trivia/questions', methods=['GET'])
 def trivia_questions():
@@ -217,18 +301,7 @@ def search_kendra(query, index_id):
     except ClientError as e:
         logger.error(f"Error querying Kendra: {e}")
         return ["Error querying Kendra."]
-
-app.route('/determine_response_type', methods=['POST'])
-def determine_response_type():
-    user_input = request.json.get("user_input", "")
-    response_type = "initial"  # Default response type
-
-    if "hello" in user_input.lower():
-        response_type = "initial"
-    # Add additional logic to determine response_type
-
-    return jsonify({"response_type": response_type})
- 
+  
 @app.route("/v1/get_response", methods=["POST"])
 def get_response():
     try:

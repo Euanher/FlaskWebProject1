@@ -89,12 +89,47 @@ def rag_tokenizer(messages):
 def get_models():
     return jsonify({"models": models}), 200
 
+def determine_response_type_logic(user_input):
+    """
+    Determine the type of response based on user input.
+
+    Args:
+        user_input (str): The input provided by the user.
+
+    Returns:
+        str: The category of the response.
+    """
+    user_input_lower = user_input.lower()
+
+    for category, keywords in rag_data.items():
+        if any(keyword in user_input_lower for keyword in keywords):
+            return category
+
+    return "default"
+
+# Route: /determine_response_type
+@app.route('/determine_response_type', methods=['POST'])
+def determine_response_type():
+    try:
+        rag_data = request.get_json()
+        user_input = rag_data.get("user_input", "").strip()
+
+        if not user_input:
+            return jsonify({"error": "Missing user input"}), 400
+
+        response_type = determine_response_type_logic(user_input)
+        return jsonify({"response_type": response_type}), 200
+    except Exception as e:
+        logger.error(f"Error in determine_response_type: {e}")
+        return jsonify({"error": "An error occurred while processing the request."}), 500
+
+
 @app.route('/v1/chat/completions', methods=['POST'])
 def chat_completions():
     try:
-        data = request.json
-        model_id = data.get("model")
-        messages = data.get("messages", [])
+        rag_data = request.json
+        model_id = rag_data.get("model")
+        messages = rag_data.get("messages", [])
         if not model_id or not messages:
             return jsonify({"error": "Missing required parameters: 'model' or 'messages'"}), 400
 
@@ -125,11 +160,7 @@ def chat_completions():
 @app.route('/v1/trivia/questions', methods=['GET'])
 def trivia_questions():
     try:
-        trivia_data = [
-            {"question": "What is the capital of France?", "options": ["Paris", "London", "Berlin", "Madrid"], "answer": "Paris", "category": "Geography"},
-            {"question": "Who wrote '1984'?", "options": ["George Orwell", "Aldous Huxley", "J.K. Rowling", "Ernest Hemingway"], "answer": "George Orwell", "category": "Literature"},
-            {"question": "Which planet is known as the Red Planet?", "options": ["Mars", "Earth", "Jupiter", "Venus"], "answer": "Mars", "category": "Science"},
-        ]
+        trivia_data = [ {rag_data: "question"["response"]}]
         return jsonify({"success": True, "trivia": trivia_data}), 200
     except Exception as e:
         logger.error(f"Error fetching trivia questions: {e}")

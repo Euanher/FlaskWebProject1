@@ -75,10 +75,12 @@
             scrollToBottom();
             $.ajax({
                 url: '/determine_response_type',
-                type: 'GET',
-                success: function (user_input) {
-                    if (user_input && user_input.response_type) {
-                        $('#chat-box').append(`<div class="message bot">${user_input.response_type}</div>`);
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ user_input: "Trivia" }), // Adjusted this to send input
+                success: function (response) {
+                    if (response.response_type) {
+                        $('#chat-box').append(`<div class="message bot">Trivia Type: ${response.response_type}</div>`);
                     } else {
                         $('#chat-box').append(`<div class="message bot">Couldn't fetch trivia right now.</div>`);
                     }

@@ -108,22 +108,21 @@ def determine_response_type_logic(user_input):
 
     return "default"
 
-# Route: /determine_response_type
 @app.route('/determine_response_type', methods=['POST'])
 def determine_response_type():
     try:
-        rag_data = request.get_json()
-        user_input = rag_data.get("user_input", "").strip()
+        # Get the user input from the request
+        user_input = request.json.get("user_input", "").strip()
 
         if not user_input:
             return jsonify({"error": "Missing user input"}), 400
 
         response_type = determine_response_type_logic(user_input)
+
         return jsonify({"response_type": response_type}), 200
     except Exception as e:
         logger.error(f"Error in determine_response_type: {e}")
         return jsonify({"error": "An error occurred while processing the request."}), 500
-
 
 @app.route('/v1/chat/completions', methods=['POST'])
 def chat_completions():

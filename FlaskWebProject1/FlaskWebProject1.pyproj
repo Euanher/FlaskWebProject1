@@ -62,6 +62,9 @@
     <Content Include="FlaskWebProject1\static\data\wizard.png" />
     <Content Include="FlaskWebProject1\static\script.js" />
     <Content Include="FlaskWebProject1\static\server.js" />
+    <Content Include="FlaskWebProject1\static\Node.js">
+      <SubType>Code</SubType>
+    </Content>
     <Content Include="requirements.txt" />
     <Content Include="FlaskWebProject1\static\content\bootstrap.css" />
     <Content Include="FlaskWebProject1\static\content\bootstrap.min.css" />

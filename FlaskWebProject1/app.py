@@ -91,14 +91,17 @@ def rag_tokenizer(messages):
 def get_models():
     return jsonify({"models": models}), 200
 
-def search_kendra(query, tokenized_messages="messages"):
+def search_kendra(query):
     try:
-        query = tokenized_messages.json.get({query:"input_text"})
-        # Placeholder for Kendra search logic
-        return [f"Result for {query}"]
+        response = kendra_client.query(
+            IndexId=KENDRA_INDEX_ID,
+            QueryText=query
+        )
+        return response.get('ResultItems', [])
     except ClientError as e:
         logger.error(f"Error querying Kendra: {e}")
         return ["Error querying Kendra."]
+
 
 # Function to determine the response type based on user input
 def determine_response_type_logic(user_input):
@@ -225,14 +228,9 @@ def get_response():
 
 @app.route('/determine_response_type', methods=['POST'])
 def determine_response_type():
-    try:
-<<<<<<< HEAD
-        user_input = request.json.get("user_input", "").strip()
-=======
+    try:  
         # Get the user input from the request
-        user_input = request.json.get("user_input", "").strip()
-
->>>>>>> f95c480b9faf8462906002915c4aeea962ded177
+        user_input = request.json.get("user_input", "").strip() 
         if not user_input:
             return jsonify({"error": "Missing user input"}), 400
         response_type = determine_response_type_logic(user_input)

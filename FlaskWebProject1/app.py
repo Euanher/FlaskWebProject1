@@ -1,5 +1,4 @@
-from uu import Error
-from flask import Flask, request, jsonify
+from flask import Flask, render_template, request, jsonify
 import os
 import logging
 import json 
@@ -10,7 +9,7 @@ import boto3
 from botocore.exceptions import ClientError
 
 # Flask App Initialization
-app = Flask(__name__, static_url_path="/static")
+app = Flask(__name__, render_template="templates", static_url_path="static")
 
 # Configuration
 AWS_REGION = "us-east-1"
@@ -38,15 +37,72 @@ openai.api_key = OPENAI_API_KEY
 generator = pipeline("text-generation", model="gpt2")
 
 # Logging setup
-logging.basicConfig(logging.error, level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s") 
 logger = logging.getLogger(__name__)
+logger.error(f"Error processing request: {request.json}, Error: {os.error}")
 
+# Tokenizer initialization for OpenAI GPT models
+def get_tokenizer(model_name="gpt-3.5-turbo"):
+    """
+    Get the tokenizer for a specific OpenAI model.
+    """
+    try:
+        return tiktoken.encoding_for_model(model_name) # type: ignore
+    except Exception as e:
+        raise ValueError(f"Error initializing tokenizer for model {model_name}: {e}")
+
+def rag_tokenizer(messages, model_name="gpt-3.5-turbo"):
+    """
+    Tokenize messages using OpenAI's tokenizer.
+    Args:
+        messages (list): List of message dictionaries with `role` and `content`.
+        model_name (str): Model name for tokenization.
+
+    Returns:
+        list: Tokenized messages with token counts.
+    """
+    try:
+        tokenizer = get_tokenizer(model_name)
+        return [
+            {
+                "role": message.get("role", ""),
+                "tokens": tokenizer.encode(message.get("content", "")),
+                "token_count": len(tokenizer.encode(message.get("content", "")))
+            }
+            for message in messages
+        ]
+    except Exception as error:
+        logger.error(f"Error tokenizing messages: {error}")
+        raise
+
+@app.route('/v1/rag_tokenizer', methods=['POST'])
+def api_rag_tokenizer():
+    try:
+        data = request.json
+        messages = data.get("messages", [])
+        model_name = data.get("model", "gpt-3.5-turbo")
+
+        if not messages or not isinstance(messages, list):
+            return jsonify({"error": "Invalid or missing 'messages'"}), 400
+
+        tokenized_messages = rag_tokenizer(messages)
+        return jsonify({"tokenized_messages": tokenized_messages}), 200
+    except Exception as error:
+        logger.error(f"Error in /v1/rag_tokenizer: {error}")
+        return jsonify({"error": f"Failed to tokenize messages: {error}"}), 500
+ 
 # Global RAG data
 rag_data = {}
 
 # Load RAG data
 def load_rag_data():
+    """
+    Load RAG (Retrieval-Augmented Generation) data from the configuration file.
+    If the file is not found or there's an error, initialize RAG data with defaults.
+    """
     global rag_data
+    if not rag_data:
+        rag_data = {"default": ["fallback_keyword"]}
     try:
         with open(CONFIG_FILE_PATH, "r", encoding="utf-8") as file:
             rag_data = json.load(file)
@@ -61,7 +117,7 @@ def load_rag_data():
         logger.error(f"Unexpected error loading RAG data: {error}")
         rag_data = {}
 
-# Load RAG data on startup
+# Initialize RAG data on startup
 load_rag_data()
 
 # Mock model information
@@ -73,24 +129,19 @@ models = [
 
 # Tokenizer functions
 def tokenize_input(input_text):
+    """Tokenize the input text."""
     return input_text.split()
 
 def rag_tokenizer(messages):
-    tokenized_messages = []
-    for message in messages:
-        role = message.get("role", "")
-        content = message.get("content", "")
-        tokenized_messages.append({
-            "role": role,
-            "tokens": tokenize_input(content),
-        })
-    return tokenized_messages
+    """
+    Tokenize an array of messages, preserving roles and content.
+    """
+    return [
+        {"role": msg.get("role", ""), "tokens": tokenize_input(msg.get("content", ""))}
+        for msg in messages
+    ]
 
-# API Endpoints
-@app.route('/v1/models', methods=['GET'])
-def get_models():
-    return jsonify({"models": models}), 200
-
+# Utility function to handle Kendra search
 def search_kendra(query):
     try:
         response = kendra_client.query(
@@ -102,180 +153,138 @@ def search_kendra(query):
         logger.error(f"Error querying Kendra: {e}")
         return ["Error querying Kendra."]
 
-
-# Function to determine the response type based on user input
-def determine_response_type_logic(user_input):
+# API Endpoints
+@app.route('/v1/models', methods=['GET'])
+def get_models():
     """
-    Determine the type of response based on user input.
-
-    Args:
-        user_input (str): The input provided by the user.
-
-    Returns:
-        str: The category of the response.
+    Fetch the list of available models.
     """
-    user_input_lower = user_input.lower()
-
-    # Check for keywords in the input and return the associated category
-    for category, keywords in rag_data.items():
-        if any(keyword in user_input_lower for keyword in keywords):
-            return category
-
-    return "default"  # Return "default" if no category matches
-
-# Define /v1/get_response route
-@app.route("/v1/get_response", methods=["POST"])
+    return jsonify({"models": models}), 200
+ 
+@app.route('/v1/get_response', methods=['POST'])
 def get_response():
     try:
-        # Extract user input from the request
-        user_input = request.json.get("user_input", "")
+        request_data = request.get_json()
+        user_input = request_data.get("user_input", "").strip()
         
         if not user_input:
-            return jsonify({"error": "Missing user input"}), 400
-        
-        # Determine the response type based on the input
+            return jsonify({"error": "Missing or invalid user input"}), 400
+
         response_type = determine_response_type_logic(user_input)
-        
-        # Search Kendra for related documents based on the user input
+
+        # Query AWS Kendra
         kendra_results = search_kendra(user_input)
-        
-        # Prepare the payload for the Llama model
-        payload = {
-            "input": user_input,
-            "model": "llama_model_id"  # Replace with your actual model ID
-        }
 
-        # Query the Llama model (replace with your actual Llama model URL)
-        llama_model_url = "http://your_llama_model_url"
-        response = requests.post(f"{llama_model_url}/predict", json=payload)
+        # Query Llama model
+        payload = {"input": user_input, "model": "llama_model_id"}
+        llama_response = requests.post(f"{llama_model_url}/predict", json=payload)
 
-        if response.status_code == 200:
-            model_output = response.json().get("output", "")
-            # Return the results from Kendra and Llama model
-            return jsonify({
-                "model_output": model_output,
-                "response_type": response_type,
-                "kendra_results": kendra_results
-            }), 200
+        if llama_response.status_code == 200:
+            model_output = llama_response.json().get("output", "No response from model")
         else:
-            logger.error(f"Llama model server error: {response.status_code} - {response.text}")
-            return jsonify({"error": "Failed to get a response from the model."}), 500
+            logger.error(f"Llama model error: {llama_response.status_code} - {llama_response.text}")
+            model_output = "Error querying the Llama model."
+
+        return jsonify({
+            "response_type": response_type,
+            "kendra_results": kendra_results,
+            "model_output": model_output
+        }), 200
     except Exception as error:
-        logger.error(f"Error in getting response: {error}")
-        return jsonify({"error": str(error)}), 500
+        logger.error(f"Error processing response: {error}")
+        return jsonify({"error": "Internal server error"}), 500
 
-# Function to determine the response type based on user input
-def determine_response_type_logic(user_input):
-    """
-    Determine the type of response based on user input.
-
-    Args:
-        user_input (str): The input provided by the user.
-
-    Returns:
-        str: The category of the response.
-    """
-    user_input_lower = user_input.lower()
-
-    # Check for keywords in the input and return the associated category
-    for category, keywords in rag_data.items():
-        if any(keyword in user_input_lower for keyword in keywords):
-            return category
-
-    return "default"  # Return "default" if no category matches
-
-# Define /v1/get_response route
-@app.route("/v1/get_response", methods=["POST"])
-def get_response():
-    try:
-        # Extract user input from the request
-        user_input = request.json.get("user_input", "")
-        
-        if not user_input:
-            return jsonify({"error": "Missing user input"}), 400
-        
-        # Determine the response type based on the input
-        response_type = determine_response_type_logic(user_input)
-        
-        # Search Kendra for related documents based on the user input
-        kendra_results = search_kendra(user_input)
-        
-        # Prepare the payload for the Llama model
-        payload = {
-            "input": user_input,
-            "model": "llama_model_id"  # Replace with your actual model ID
-        }
-
-        # Query the Llama model (replace with your actual Llama model URL)
-        llama_model_url = "http://your_llama_model_url"
-        response = requests.post(f"{llama_model_url}/predict", json=payload)
-
-        if response.status_code == 200:
-            model_output = response.json().get("output", "")
-            # Return the results from Kendra and Llama model
-            return jsonify({
-                "model_output": model_output,
-                "response_type": response_type,
-                "kendra_results": kendra_results
-            }), 200
-        else:
-            logger.error(f"Llama model server error: {response.status_code} - {response.text}")
-            return jsonify({"error": "Failed to get a response from the model."}), 500
-    except Exception as error:
-        logger.error(f"Error in getting response: {error}")
-        return jsonify({"error": str(error)}), 500
-
-
-@app.route('/determine_response_type', methods=['POST'])
-def determine_response_type():
-    try:  
-        # Get the user input from the request
-        user_input = request.json.get("user_input", "").strip() 
-        if not user_input:
-            return jsonify({"error": "Missing user input"}), 400
-        response_type = determine_response_type_logic(user_input)
-
-        return jsonify({"response_type": response_type}), 200
-    except Exception as error:
-        return jsonify({"error": str(error)}), 500 
 
 @app.route('/v1/chat/completions', methods=['POST'])
 def chat_completions():
+    """
+    Generate chat completions based on input messages and model ID.
+    """
     try:
-        rag_data = request.json
-        model_id = rag_data.get("model")
-        messages = rag_data.get("messages", [])
+        data = request.json
+        model_id = data.get("model")
+        messages = data.get("messages", [])
+        
         if not model_id or not messages:
             return jsonify({"error": "Missing required parameters: 'model' or 'messages'"}), 400
 
         tokenized_messages = rag_tokenizer(messages)
 
+        # Process specific model logic
         if model_id == "qwen2.5-3b-instruct":
             response = {
                 "id": "chatcmpl-123",
                 "object": "chat.completion",
-                "choices": [
-                    {
-                        "message": {
-                            "role": "assistant",
-                            "content": "The day is Thursday, I must say. It rhymes in a poetic way."
-                        }
-                    }
-                ],
+                "choices": [{"message": {"role": "assistant", "content": "Here's your answer!"}}],
                 "tokenized_input": tokenized_messages,
             }
-            return jsonify(response), 200
+            return jsonify({"response": "Here's your answer!", "system_messages": []}), 200
         else:
             return jsonify({"error": f"Model '{model_id}' not supported"}), 400
+
     except Exception as error:
         logger.error(f"Error processing chat completions: {error}")
         return jsonify({"error": str(error)}), 500
 
-# Route: /v1/trivia/questions
+
+# Function to determine the response type based on user input
+def determine_response_type_logic(user_input):
+    """
+    Determine the type of response based on user input.
+
+    Args:
+        user_input (str): The input provided by the user.
+
+    Returns:
+        str: The category of the response.
+    """
+    user_input_lower = user_input.lower()
+
+    # Check for keywords in the input and return the associated category
+    for category, keywords in rag_data.items():
+        if any(keyword in user_input_lower for keyword in keywords):
+            return category
+
+    return "default"  # Return "default" if no category matches
+  
+# Miscellaneous routes
+@app.route('/')
+def index():
+    """Render the home page."""
+    return render_template('index.html')
+
+@app.route('/v1/embeddings', methods=['POST'])
+def embeddings():
+    try:
+        tokenized_input = request.json
+        input_text = tokenized_input.get("input", "")
+        if not input_text:
+            return jsonify({"error": "Missing required parameter: 'input'"}), 400
+
+        tokenized_input = tokenize_input(input_text)
+        response = {"object": "embedding", "data": [{"embedding": [0.1, 0.2, 0.3]}]}   
+        return jsonify(response), 200
+
+    except Exception as error:
+        logger.error(f"Error processing embeddings: {error}")
+        return jsonify({"error": str(error)}), 500
+      
+@app.route('/determine_response_type', methods=['POST'])
+def determine_response_type():
+    try:  
+        user_input = request.json.get("user_input", "").strip() 
+        if not user_input:
+            return jsonify({"error": "Missing user input"}), 400
+        response_type = determine_response_type_logic(user_input)
+
+        return jsonify({"message": response_type}), 200
+    except Exception as error:         
+        return jsonify({"error": str(error)}), 500 
+
 @app.route('/v1/trivia/questions', methods=['GET'])
 def trivia_questions():
     try:
-        trivia_data = [ {rag_data: "question"["response"]}]
+        trivia_data = [{"question": "What is the capital of France?", "response": "Paris"}]
         return jsonify({"success": True, "trivia": trivia_data}), 200
     except Exception as e:
         logger.error(f"Error fetching trivia questions: {e}")
@@ -287,92 +296,33 @@ def completions():
     try:
         data = request.json
         prompt = data.get("prompt", "")
+        
         if not prompt:
             return jsonify({"error": "Missing required parameter: 'prompt'"}), 400
 
+        # Tokenizing the input (real tokenization can be more complex depending on your needs)
         tokenized_prompt = tokenize_input(prompt)
+
+        # This can be a mock embedding or replaced with actual embedding generation logic
+        # For now, returning a mock embedding
+        mock_embedding = [0.1, 0.2, 0.3]  
+
+        # Creating the response structure similar to what you expect
         response = {
             "id": "cmpl-456",
             "object": "text_completion",
-            "choices": [{"text": "The answer you seek lies in the lines; rhyming is fun, and it's always sublime."}],
+            "choices": [{
+                "text": "The answer you seek lies in the lines; rhyming is fun, and it's always sublime."
+            }],
             "tokenized_input": tokenized_prompt,
+            "embedding": mock_embedding,  # Adding embedding data
         }
+
         return jsonify(response), 200
+
     except Exception as error:
         logger.error(f"Error processing completions: {error}")
         return jsonify({"error": str(error)}), 500
-
-# Route: /v1/embeddings
-@app.route('/v1/embeddings', methods=['POST'])
-def embeddings():
-    try:
-        data = request.json
-        input_text = data.get("input", "")
-        if not input_text:
-            return jsonify({"error": "Missing required parameter: 'input'"}), 400
-
-        tokenized_input = tokenize_input(input_text)
-        response = {"object": "embedding", "data": [{"embedding": [0.1, 0.2, 0.3]}], "tokenized_input": tokenized_input}
-        return jsonify(response), 200
-    except Exception as e:
-        logger.error(f"Error processing embeddings: {e}")
-        return jsonify({"error": str(e)}), 500
-
-# Function to search Kendra
-def search_kendra(query, index_id):
-    """
-    Queries AWS Kendra for the specified query.
-
-    :param query: The query string to search in Kendra.
-    :param index_id: The ID of the Kendra index to query.
-    :return: A list of document titles that match the query, or an error message.
-    """
-    try:
-        response = kendra_client.query(
-            IndexId=index_id,
-            QueryText=query
-        )
-        results = response.get('ResultItems', [])
-        if results:
-            return [result['DocumentTitle']['Text'] for result in results if 'DocumentTitle' in result]
-        else:
-            return ["No relevant documents found."]
-    except ClientError as e:
-        logger.error(f"Error querying Kendra: {e}")
-        return ["Error querying Kendra."]
-  
-@app.route("/v1/get_response", methods=["POST"])
-def get_response():
-    try:
-        user_input = request.json.get("user_input", "")
-        response_type = determine_response_type(user_input)
-        
-        # Search Kendra for related documents based on user input
-        kendra_results = search_kendra(user_input)
-
-        # Prepare the payload for the Llama model
-        payload = {
-            "input": user_input,
-            "model": llama_model_id
-        }
-
-        # Query the Llama model
-        response = requests.post(f"{llama_model_url}/predict", json=payload)
-
-        if response.status_code == 200:
-            model_output = response.json().get("output", "")
-            selected_response = response(response_type)
-            return jsonify({
-                "model_output": model_output,
-                "selected_response": selected_response,
-                "kendra_results": kendra_results  # Include Kendra search results in the response
-            }), 200
-        else:
-            logger.error(f"Llama model server error: {response.status_code} - {response.text}")
-            return jsonify({"error": "Failed to get a response from the model."}), 500
-    except Exception as error:
-        logger.error(f"Error in getting response: {error}")
-        return jsonify({"error": str(error)}), 500
-
+     
 if __name__ == '__main__':
     app.run(debug=True)

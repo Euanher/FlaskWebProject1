@@ -17,7 +17,16 @@ app.use(json());
 app.use(urlencoded({ extended: true }));
 
 // Multer setup for file uploads
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 50 * 1024 * 1024 }, // Example limit: 50MB
+    fileFilter: (req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+            return cb(new Error('Only image files are allowed!'), false);
+        }
+        cb(null, true);
+    }
+});
 
 // AWS SDK Configuration
 config.update({
@@ -61,7 +70,7 @@ app.get('/get_trivia', async (req, res) => {
 });
 
 // Upload file to S3
-app.post('/upload_to_s3', upload.single('file'), (req, res) => {
+app.post('/upload_to_s3', upload.single('file'), async (req, res) => {
     const { bucketName } = req.body;
     const file = req.file;
 
@@ -77,13 +86,13 @@ app.post('/upload_to_s3', upload.single('file'), (req, res) => {
         ContentType: file.mimetype,
     };
 
-    s3.upload(params, (err, data) => {
-        if (err) {
-            console.error('Error uploading to S3:', err);
-            return res.status(500).json({ error: 'Error uploading to S3.' });
-        }
+    try {
+        const data = await s3.upload(params).promise();
         res.json({ message: 'File uploaded successfully.', data });
-    });
+    } catch (err) {
+        console.error('Error uploading to S3:', err);
+        res.status(500).json({ error: 'Error uploading to S3.' });
+    }
 });
 
 // Store chat history in DynamoDB
@@ -128,12 +137,6 @@ app.post('/api/process_user_input', (req, res) => {
         assistant_response: { response: botResponse },
         system_messages: systemMessages,
     });
-});
-
-// Auto hello endpoint
-app.post('/v1/auto_hello', (req, res) => {
-    const autoHelloMessage = "Hello! Welcome to TRIVIA.io. How can I assist you today?";
-    res.json({ auto_hello_response: autoHelloMessage });
 });
 
 // Generic error handler

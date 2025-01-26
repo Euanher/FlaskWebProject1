@@ -6,7 +6,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const startGameButton = document.querySelector('#start-game');
     const darkModeToggle = document.querySelector('#dark-mode-toggle');
     const avatars = document.querySelectorAll('.avatar');
-    const data = await fetchAPI('/v1/chat/completions', { user_message: userInputValue });
+
+    async function fetchAPI(url, payload) {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+
+        return response.json();
+    }
 
     // Handle Send Button click
     sendButton.addEventListener('click', async () => {
@@ -21,8 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleLoader(true);
 
         try {
-            const data = await fetchAPI('/v1/chat/completions', { prompt: userInputValue });
-            handleChatResponse(data, userInputValue);
+            const data = await fetchAPI('/api/process_user_input', { user_message: userInputValue });
+            handleResponse(data, userInputValue);
         } catch (error) {
             console.error('Error:', error);
             displayMessage('system_message', 'Sorry, there was an error processing your request.');
@@ -39,29 +52,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Utility Function: Fetch API
-    async function fetchAPI(url, payload) {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-
-        return response.json();
-    }
-
     // Utility Function: Toggle Loader
     function toggleLoader(isVisible) {
         loader.style.display = isVisible ? 'block' : 'none';
     }
 
-    // Handle Chat API Response
-    function handleChatResponse(data, userInputValue) {
-        const assistantMessage = data.response || "No response from assistant.";
+    // Handle Response
+    function handleResponse(data, userInputValue) {
+        const assistantMessage = data.assistant_response?.response || "No response from assistant.";
         const systemMessages = data.system_messages || [];
 
         // Display user and bot messages
@@ -77,6 +75,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Utility Function: Display Messages
     function displayMessage(sender, message) {
+        if (messagesDiv.lastChild && messagesDiv.lastChild.textContent === message) return;
+
         const messageElement = document.createElement('div');
         messageElement.classList.add('message', sender);
         messageElement.textContent = message;
@@ -115,8 +115,8 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleLoader(true);
 
         try {
-            const data = await fetchAPI('/v1/completions', { prompt: 'What is the capital of France?' });
-            const triviaQuestion = data.response || "No question available.";
+            const data = await fetchAPI('/determine_response_type', {});
+            const triviaQuestion = data.question || "No question available.";
             displayMessage('bot', triviaQuestion);
         } catch (error) {
             console.error('Error:', error);

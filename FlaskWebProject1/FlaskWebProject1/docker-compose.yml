@@ -17,8 +17,6 @@ services:
     networks:
       - localstack_network
 
-   
 networks:
   localstack_network:
     driver: bridge
-

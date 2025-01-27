@@ -36,8 +36,16 @@
 <!-- Dark Mode Toggle -->
 <button id="dark-mode-toggle">Toggle Dark Mode</button>
 
+<!-- Dynamically include JavaScript files -->
+{% for script in api %}
+<script src="{{ script }}"></script>
+{% endfor %}
+
 <!-- jQuery -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+<script src="{{ url_for('static', filename='data/doc_rag.json') }}"></script>
+
 <script>
     $(document).ready(function () {
         // Splash Screen Timer
@@ -73,16 +81,19 @@
         function fetchTriviaQuestion() {
             $('#chat-box').append(`<div class="message system">Fetching trivia question...</div>`);
             scrollToBottom();
+
             $.ajax({
                 url: '/determine_response_type',
                 type: 'POST',
                 contentType: 'application/json',
-                data: JSON.stringify({ user_input: "Trivia" }), // Adjusted this to send input
+                data: JSON.stringify({ user_input: "yes" }),  // User input
                 success: function (response) {
-                    if (response.response_type) {
-                        $('#chat-box').append(`<div class="message bot">Trivia Type: ${response.response_type}</div>`);
+                    // Check the response and display the trivia question
+                    if (response.response_type === 'Trivia Question') {
+                        $('#chat-box').append(`<div class="message bot">${response.question}</div>`);
+                        $('#chat-box').append(`<div class="message bot">Options: ${response.options.join(', ')}</div>`);
                     } else {
-                        $('#chat-box').append(`<div class="message bot">Couldn't fetch trivia right now.</div>`);
+                        $('#chat-box').append(`<div class="message bot">${response.message}</div>`);
                     }
                     scrollToBottom();
                 },
@@ -92,6 +103,7 @@
                 }
             });
         }
+
 
         // Handle User Input
         $('#send-btn').click(function () {
@@ -124,7 +136,7 @@
         $('#find-trivia-btn').click(function () {
             fetchTriviaQuestion();
         });
-
     });
 </script>
+
 {% endblock %}

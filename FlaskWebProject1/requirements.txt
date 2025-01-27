@@ -31,6 +31,6 @@ six==1.17.0
 tqdm==4.67.1
 typing_extensions==4.12.2
 urllib3==1.26.20
-Werkzeug==2.2.2  # This is the compatible version with Flask 2.2.3
-yarl==1.18.3
+Werkzeug==2.2.2
 zipp==3.21.0
+Flask==2.2.3

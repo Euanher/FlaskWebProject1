@@ -4,6 +4,7 @@ Routes and views for the flask application.
 
 from datetime import datetime
 from flask import render_template
+from requests import api
 from FlaskWebProject1 import app
 
 @app.route('/')
@@ -13,6 +14,7 @@ def home():
     return render_template(
         'index.html',
         title='Home Page',
+        api=["./server.js", "./script.js"],  
         year=datetime.now().year,
     )
 

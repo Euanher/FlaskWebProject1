@@ -11,7 +11,8 @@ import boto3
 from botocore.exceptions import ClientError
 
 # Flask App Initialization
-app = Flask(__name__, render_template="templates", template_folder="static")
+app = Flask(__name__, template_folder="templates", static_folder="static")
+app.config['DEBUG'] = True 
 
 # Configuration
 AWS_REGION = "us-east-1"
@@ -160,29 +161,15 @@ def api_rag_tokenizer():
 @app.route('/v1/get_response', methods=['POST'])
 def get_response():
     try:
+        logger.debug("Received request for /v1/get_response")
         data = request.get_json()
         user_input = data.get("user_input", "").strip()
-
         if not user_input:
             return jsonify({"error": "Missing or invalid user input"}), 400
-
-        # Perform Kendra search
-        kendra_results = search_kendra(user_input)
-
-        # Query the Llama model
-        payload = {"input": user_input, "model": llama_model_id}
-        llama_response = requests.post(f"{llama_model_url}/predict", json=payload)
-        model_output = llama_response.json().get("output", "No response from model") if llama_response.status_code == 200 else "Error querying the Llama model."
-
-        return jsonify({
-            "response_type": "Trivia Question",
-            "kendra_results": kendra_results,
-            "model_output": model_output
-        }), 200
+        # Continue with response logic...
     except Exception as error:
         logger.error(f"Error in /v1/get_response: {error}")
         return jsonify({"error": "Internal server error"}), 500
- 
 
 # API Endpoints
 @app.route('/v1/models', methods=['GET'])
@@ -402,7 +389,7 @@ def chat_completions():
     except Exception as error:
         logger.error(f"Error processing chat completions: {error}")
         return jsonify({"error": f"Internal server error: {str(error)}"}), 500
-
+    
 
 if __name__ == "__main__": 
     app.run(debug=True)

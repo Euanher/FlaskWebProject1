@@ -28,7 +28,9 @@
 <div id="chat-box" style="display: none;"></div>
 <input type="text" id="user-input" placeholder="Enter your message" style="display: none;">
 <button id="send-btn" style="display: none;">Send</button>
-<div id="loader" class="loader" style="display: none;">Loading...</div>
+<div id="loader" class="loader" style="display: none;">
+    <img src="{{ url_for('static', filename='data/loader.gif') }}" alt="Loading...">
+</div>
 
 <!-- Find Trivia Button -->
 <button id="find-trivia-btn" style="display: none;">Find Trivia</button>
@@ -36,14 +38,12 @@
 <!-- Dark Mode Toggle -->
 <button id="dark-mode-toggle">Toggle Dark Mode</button>
 
-<!-- Dynamically include JavaScript files -->
-{% for script in api %}
-<script src="{{ script }}"></script>
-{% endfor %}
+<!-- Favicon -->
+<link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
 
-<!-- jQuery -->
+<!-- JavaScript Files -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="{{ url_for('static', filename='script.js') }}"></script>
+<script src="{{ url_for('static', filename='scripts/script.js') }}"></script>
 <script src="{{ url_for('static', filename='data/doc_rag.json') }}"></script>
 
 <script>
@@ -54,9 +54,13 @@
             $('.avatar-selection').show();
         }, 3000);
 
-        // Dark Mode Toggle
+        // Dark Mode Toggle with Persistence
+        const isDarkMode = localStorage.getItem('dark-mode') === 'true';
+        if (isDarkMode) $('body').addClass('dark-mode');
+
         $('#dark-mode-toggle').click(function () {
             $('body').toggleClass('dark-mode');
+            localStorage.setItem('dark-mode', $('body').hasClass('dark-mode'));
         });
 
         // Avatar Selection
@@ -72,13 +76,14 @@
             fetchTriviaQuestion();
         });
 
-        // Auto-scroll to the bottom of the chat box
+        // Auto-scroll to Chat Bottom
         function scrollToBottom() {
             $('#chat-box').scrollTop($('#chat-box')[0].scrollHeight);
         }
 
         // Fetch Trivia Question
         function fetchTriviaQuestion() {
+            $('#find-trivia-btn').prop('disabled', true);
             $('#chat-box').append(`<div class="message system">Fetching trivia question...</div>`);
             scrollToBottom();
 
@@ -86,24 +91,24 @@
                 url: '/determine_response_type',
                 type: 'POST',
                 contentType: 'application/json',
-                data: JSON.stringify({ user_input: "yes" }),  // User input
+                data: JSON.stringify({ user_input: "yes" }),
                 success: function (response) {
-                    // Check the response and display the trivia question
                     if (response.response_type === 'Trivia Question') {
                         $('#chat-box').append(`<div class="message bot">${response.question}</div>`);
                         $('#chat-box').append(`<div class="message bot">Options: ${response.options.join(', ')}</div>`);
                     } else {
                         $('#chat-box').append(`<div class="message bot">${response.message}</div>`);
                     }
+                    $('#find-trivia-btn').prop('disabled', false);
                     scrollToBottom();
                 },
                 error: function () {
                     $('#chat-box').append(`<div class="message bot">Error fetching trivia question.</div>`);
+                    $('#find-trivia-btn').prop('disabled', false);
                     scrollToBottom();
                 }
             });
         }
-
 
         // Handle User Input
         $('#send-btn').click(function () {
@@ -112,6 +117,7 @@
                 $('#loader').show();
                 $('#chat-box').append(`<div class="message user">${userInput}</div>`);
                 scrollToBottom();
+
                 $.ajax({
                     url: '/v1/get_response',
                     type: 'POST',
@@ -132,11 +138,17 @@
             }
         });
 
-        // Attach event listener to Trivia button
+        // Handle Enter Key for Input
+        $('#user-input').keypress(function (e) {
+            if (e.which === 13) {
+                $('#send-btn').click();
+            }
+        });
+
+        // Trivia Button Click
         $('#find-trivia-btn').click(function () {
             fetchTriviaQuestion();
         });
     });
 </script>
-
 {% endblock %}

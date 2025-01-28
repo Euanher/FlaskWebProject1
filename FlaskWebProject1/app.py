@@ -11,7 +11,7 @@ import boto3
 from botocore.exceptions import ClientError
 
 # Flask App Initialization
-app = Flask(__name__, render_template="templates", static_url_path="static/server.js")
+app = Flask(__name__, render_template="templates", template_folder="static")
 
 # Configuration
 AWS_REGION = "us-east-1"
@@ -36,13 +36,12 @@ kendra_client = boto3.client(
 # OpenAI Setup
 openai.api_key = OPENAI_API_KEY
 
-# Initialize the text-generation model
+# Initialize text generation model
 generator = pipeline("text-generation", model="gpt2")
 
 # Logging setup
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s") 
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
-logger.error(f"Error processing request: {request.json}, Error: {os.error}")
 
 # Tokenizer initialization for OpenAI GPT models
 def get_tokenizer(models="gpt-3.5-turbo"):
@@ -54,20 +53,7 @@ def get_tokenizer(models="gpt-3.5-turbo"):
     except Exception as e:
         raise ValueError(f"Error initializing tokenizer for model {models}: {e}")
 
-# Tokenizer functions
-def tokenize_input(input_text):
-    """Tokenize the input text."""
-    return input_text.split()
-
-def rag_tokenizer(messages):
-    """Tokenize an array of messages, preserving roles and content."""
-    return [{
-        "role": msg.get("role", ""),
-        "tokens": tokenize_input(msg.get("content", "")),
-        "content": msg.get("content", "")
-    } for msg in messages]
-
-
+  
 # Utility function to handle Kendra search
 def search_kendra(query):
     try:
@@ -95,19 +81,19 @@ def api_rag_tokenizer():
     except Exception as error:
         logger.error(f"Error in /v1/rag_tokenizer: {error}")
         return jsonify({"error": f"Failed to tokenize messages: {error}"}), 500
- 
-# Global RAG data
+  
+# Mock model information
+models = [
+    {"id": "qwen2.5-3b-instruct", "name": "Qwen 2.5 3B Instruct"},
+    {"id": "gpt-3.5-turbo", "name": "GPT 3.5 Turbo"},
+    {"id": "hermes-3-llama-3.2-3b", "name": "Hermes 3 LLaMA 3.2 3B"},
+]
+
+# RAG Data Initialization
 rag_data = {}
 
-# Load RAG data
 def load_rag_data():
-    """
-    Load RAG (Retrieval-Augmented Generation) data from the configuration file.
-    If the file is not found or there's an error, initialize RAG data with defaults.
-    """
     global rag_data
-    if not rag_data:
-        rag_data = {"default": ["fallback_keyword"]}
     try:
         with open(CONFIG_FILE_PATH, "r", encoding="utf-8") as file:
             rag_data = json.load(file)
@@ -122,32 +108,81 @@ def load_rag_data():
         logger.error(f"Unexpected error loading RAG data: {error}")
         rag_data = {}
 
-
-# Mock model information
-models = [
-    {"id": "qwen2.5-3b-instruct", "name": "Qwen 2.5 3B Instruct"},
-    {"id": "gpt-3.5-turbo", "name": "GPT 3.5 Turbo"},
-    {"id": "hermes-3-llama-3.2-3b", "name": "Hermes 3 LLaMA 3.2 3B"},
-]
-
-# Initialize RAG data on startup
 load_rag_data()
 
-# Tokenizer functions
+# Utility: Tokenization
 def tokenize_input(input_text):
-    """Tokenize the input text."""
     return input_text.split()
 
 def rag_tokenizer(messages):
-    """
-    Tokenize an array of messages, preserving roles and content.
-    """
     return [{
         "role": msg.get("role", ""),
         "tokens": tokenize_input(msg.get("content", "")),
         "content": msg.get("content", "")
     } for msg in messages]
-  
+
+# Utility: Kendra Search
+def search_kendra(query):
+    try:
+        response = kendra_client.query(
+            IndexId=KENDRA_INDEX_ID,
+            QueryText=query
+        )
+        return response.get('ResultItems', [])
+    except ClientError as e:
+        logger.error(f"Error querying Kendra: {e}")
+        return ["Error querying Kendra."]
+
+# Endpoints
+@app.route('/v1/models', methods=['GET'])
+def get_models():
+    models = [
+        {"id": "qwen2.5-3b-instruct", "name": "Qwen 2.5 3B Instruct"},
+        {"id": "gpt-3.5-turbo", "name": "GPT 3.5 Turbo"},
+        {"id": "hermes-3-llama-3.2-3b", "name": "Hermes 3 LLaMA 3.2 3B"}
+    ]
+    return jsonify({"models": models}), 200
+
+@app.route('/v1/rag_tokenizer', methods=['POST'])
+def api_rag_tokenizer():
+    try:
+        data = request.json
+        messages = data.get("messages", [])
+        if not messages or not isinstance(messages, list):
+            return jsonify({"error": "Invalid or missing 'messages'"}), 400
+
+        tokenized_messages = rag_tokenizer(messages)
+        return jsonify({"tokenized_messages": tokenized_messages}), 200
+    except Exception as error:
+        logger.error(f"Error in /v1/rag_tokenizer: {error}")
+        return jsonify({"error": f"Failed to tokenize messages: {error}"}), 500
+
+@app.route('/v1/get_response', methods=['POST'])
+def get_response():
+    try:
+        data = request.get_json()
+        user_input = data.get("user_input", "").strip()
+
+        if not user_input:
+            return jsonify({"error": "Missing or invalid user input"}), 400
+
+        # Perform Kendra search
+        kendra_results = search_kendra(user_input)
+
+        # Query the Llama model
+        payload = {"input": user_input, "model": llama_model_id}
+        llama_response = requests.post(f"{llama_model_url}/predict", json=payload)
+        model_output = llama_response.json().get("output", "No response from model") if llama_response.status_code == 200 else "Error querying the Llama model."
+
+        return jsonify({
+            "response_type": "Trivia Question",
+            "kendra_results": kendra_results,
+            "model_output": model_output
+        }), 200
+    except Exception as error:
+        logger.error(f"Error in /v1/get_response: {error}")
+        return jsonify({"error": "Internal server error"}), 500
+ 
 
 # API Endpoints
 @app.route('/v1/models', methods=['GET'])
@@ -175,38 +210,6 @@ def process_user_input():
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
  
-@app.route('/v1/get_response', methods=['POST'])
-def get_response():
-    """Get a response based on user input."""
-    try:
-        request_data = request.get_json()
-        user_input = request_data.get("user_input", "").strip()
-        
-        if not user_input:
-            return jsonify({"error": "Missing or invalid user input"}), 400
-
-        response_type = determine_response_type_logic(user_input)
-
-        kendra_results = search_kendra(user_input)
-
-        payload = {"input": user_input, "model": "llama_model_id"}
-        llama_response = requests.post(f"{llama_model_url}/predict", json=payload)
-
-        if llama_response.status_code == 200:
-            model_output = llama_response.json().get("output", "No response from model")
-        else:
-            logger.error(f"Llama model error: {llama_response.status_code} - {llama_response.text}")
-            model_output = "Error querying the Llama model."
-        
-        return jsonify({
-            "response_type": response_type,
-            "kendra_results": kendra_results,
-            "model_output": model_output
-        }), 200
-
-    except Exception as error:
-        logger.error(f"Error processing response: {error}")
-        return jsonify({"error": "Internal server error"}), 500
 
 @app.route('/v1/chat/completions', methods=['POST'])
 def chat_completions():

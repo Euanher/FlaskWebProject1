@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "*.embeddedhtml": "html",
+        "plyconfig.json": "jsonc"
+    },
+    "iis.configDir": "${workspaceFolder}\\.vs\\FlaskWebProject1\\config"
+}

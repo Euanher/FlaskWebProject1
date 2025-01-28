@@ -60,8 +60,8 @@
     <Content Include="FlaskWebProject1\static\data\R.png" />
     <Content Include="FlaskWebProject1\static\data\text-1736398588016.png" />
     <Content Include="FlaskWebProject1\static\data\wizard.png" />
-    <Content Include="FlaskWebProject1\static\script.js" />
-    <Content Include="FlaskWebProject1\static\server.js" />
+    <Content Include="FlaskWebProject1\static\scripts\script.js" />
+    <Content Include="FlaskWebProject1\static\scripts\server.js" />
     <Content Include="javascript.sarif" />
     <Content Include="python.sarif" />
     <Content Include="requirements.txt" />

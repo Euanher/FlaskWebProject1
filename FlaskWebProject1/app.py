@@ -1,10 +1,8 @@
-from ast import Global
 import time
 from flask import Flask, render_template, request, jsonify
 import os
 import logging
 import json 
-import requests
 from transformers import pipeline  # type: ignore
 import openai
 import boto3
